@@ -4,21 +4,13 @@ from sqlalchemy.orm import sessionmaker
 from sources.rdbms.sources.generic_rdbms_source import GenericRDBMSSource
 from .sample_data import Base, User, Permission, populate_sample_data
 
-@pytest.fixture(scope="module")
-def db_session():
-    """Fixture to set up an in-memory SQLite database."""
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
+@pytest.fixture
+def source(db_session):
+    """
+    Fixture to initialize GenericRDBMSSource using the PostgreSQL db_session.
+    """
+    return GenericRDBMSSource(db_session.bind.url)  # Pass the PostgreSQL engine URL
 
-    # Populate sample data
-    with Session() as session:
-        populate_sample_data(session)
-
-    yield Session
-
-    # Teardown
-    Base.metadata.drop_all(engine)
 
 @pytest.fixture
 def source(db_session):

@@ -24,3 +24,11 @@ List of databases
 # connection = psycopg2.connect( dbname="test_db",user="test_user",password="test_password",host="localhost",port=5433) 
 # connection to server at "0.0.0.0", port 5433 failed: Cannot assign requested address (0x00002741/10049)
 ## Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False   [It was an firewall]
+
+ netstat -an | findstr 5433
+  TCP    0.0.0.0:5433           0.0.0.0:0              LISTENING
+  TCP    [::]:5433              [::]:0                 LISTENING
+  TCP    [::1]:5433             [::]:0                 LISTENING
+
+## Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True   [Enable Again]
+
