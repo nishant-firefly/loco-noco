@@ -14,6 +14,8 @@ python -m pip install --upgrade pip
     python -m pip install -r .\sources\tests\requirements.txt
 #  Run all Test DBs (Prerequisite to run test cases) 
     $env:PYTHONPATH = "$env:PYTHONPATH;$(Get-Location)" # For Powershell
+    set PYTHONPATH=%PYTHONPATH%;%CD%  # For CMD 
+    export PYTHONPATH=$(pwd) # bash to permanent set to ~/.bashrc | ~/.zshrc | ~/.config/fish/config.fish
 
     python .\sources\tests\test_env_manager.py --start
 # Other useful commands 
