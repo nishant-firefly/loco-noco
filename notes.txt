@@ -1,0 +1,14 @@
+# Root directories
+mkdir sources, auth
+
+# RDBMS directories
+mkdir sources\rdbms\{helpers,models,sources,tests}
+
+# Elasticsearch directories
+mkdir sources\elasticsearch\{helpers,sources,tests}
+
+# AWS directories
+mkdir sources\aws\{helpers,sources,tests}
+
+# Auth Module directories
+mkdir auth\{models,services,helpers,tests}
