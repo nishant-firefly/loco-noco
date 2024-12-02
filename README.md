@@ -13,6 +13,8 @@ python -m pip install --upgrade pip
 #  Install Dependency (One Time) 
     python -m pip install -r .\sources\tests\requirements.txt
 #  Run all Test DBs (Prerequisite to run test cases) 
+    $env:PYTHONPATH = "$env:PYTHONPATH;$(Get-Location)" # For Powershell
+
     python .\sources\tests\test_env_manager.py --start
 # Other useful commands 
     python .\sources\tests\test_env_manager.py -h  | --status | --start | --stop
