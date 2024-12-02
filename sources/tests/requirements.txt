@@ -1,2 +1,3 @@
 # This will be used to run test services, mentioned in test_config.py
 docker==7.1.0
+pytest==8.3.4
