@@ -2,3 +2,25 @@
     git check-ignore -v venv/
     .gitignore:3:venv/      venv/
 # see sources >> pytest.ini and configtest.py
+
+# Docker commands  
+> docker exec -it test_loco_noco_postgres pg_isready -U test_user -d test_db
+/var/run/postgresql:5432 - accepting connections
+> docker inspect test_loco_noco_postgres | Select-String -Pattern "HostIp"  # For shell => | grep -i HostIp 
+> docker inspect test_loco_noco_postgres | Select-String -Pattern "Port"    # For shell => | grep -i port 
+
+> docker exec -it test_loco_noco_postgres psql -U test_user -d test_db -c '\l'
+List of databases
+   Name    |   Owner   | Encoding |  Collate   |   Ctype    |    Access privileges
+-----------+-----------+----------+------------+------------+-------------------------
+ postgres  | test_user | UTF8     | en_US.utf8 | en_US.utf8 |
+ template0 | test_user | UTF8     | en_US.utf8 | en_US.utf8 | =c/test_user           +
+           |           |          |            |            | test_user=CTc/test_user
+ template1 | test_user | UTF8     | en_US.utf8 | en_US.utf8 | =c/test_user           +
+           |           |          |            |            | test_user=CTc/test_user
+ test_db   | test_user | UTF8     | en_US.utf8 | en_US.utf8 |
+(4 rows)
+
+# connection = psycopg2.connect( dbname="test_db",user="test_user",password="test_password",host="localhost",port=5433) 
+# connection to server at "0.0.0.0", port 5433 failed: Cannot assign requested address (0x00002741/10049)
+## Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False   [It was an firewall]
