@@ -1,3 +1,4 @@
 # .gitignore : 
     git check-ignore -v venv/
     .gitignore:3:venv/      venv/
+# see sources >> pytest.ini and configtest.py
