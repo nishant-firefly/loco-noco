@@ -1,6 +1,6 @@
 import docker
 import argparse
-from test_config import TEST_ENV_CONFIG
+from .test_config import TEST_ENV_CONFIG
 
 client = docker.from_env()
 
