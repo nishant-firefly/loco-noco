@@ -9,9 +9,9 @@ TEST_ENV_CONFIG = {
                 "POSTGRES_PASSWORD": "test_password",
                 "POSTGRES_DB": "test_db",
             },
-            "ports": {"5433": "5432"},  # Host port 5433 maps to container port 5432
+            "ports": {"5432": "5432"},  
             "healthcheck": {
-                "test": ["CMD-SHELL", "pg_isready -U test_user -d test_db"],
+                "test": ["CMD-SHELL", "pg_isready -U test_user -d test_db -p 5432"],
                 "interval": 5,
                 "retries": 5,
             },
