@@ -23,5 +23,4 @@ python -m pip install --upgrade pip
     python .\sources\tests\test_env_manager.py 
     docker rm -f $(docker ps -a -q -f "name=test_loco_") # Remove all service container 
 ```
-
-
+python main.py
