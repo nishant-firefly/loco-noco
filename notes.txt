@@ -12,3 +12,85 @@ mkdir sources\aws\{helpers,sources,tests}
 
 # Auth Module directories
 mkdir auth\{models,services,helpers,tests}
+
+
+
+
+
+
+query
+## 1. CREATE (Insert a new record)
+
+INSERT INTO users (id, name, email, phone) 
+VALUES (4, 'john', 'anamay@example.com', '1239067890');
+
+
+## 2. READ (Retrieve records)
+a. Retrieve all records:
+
+SELECT * FROM users;
+
+b. Retrieve a specific record by ID:
+
+SELECT * FROM users WHERE id = 2;
+
+c. Retrieve users with a specific email:
+
+SELECT * FROM users WHERE email = 'jane.doe@example.com';
+
+d. Retrieve users with a specific phone (filtering for NULL values):
+
+SELECT * FROM users WHERE phone IS NULL;
+
+e. Retrieve users with IDs greater than a certain value:
+
+SELECT * FROM users WHERE id > 20;
+
+
+
+## 3. UPDATE (Modify existing records)
+a. Update the name of a user:
+
+UPDATE users 
+SET name = 'deepti' 
+WHERE id = 2;
+
+b. Update the email and phone for a user:
+
+UPDATE users 
+SET email = 'arya@example.com', phone = '9876543210' 
+WHERE id = 25;
+
+SELECT * FROM users;
+SELECT * FROM users ORDER BY id ASC;
+
+
+c. Update all users with a specific condition:
+
+
+UPDATE users 
+SET phone = '9999999999' 
+WHERE email = 'jane.doe@example.com';
+
+SELECT * FROM users;
+
+4. DELETE (Remove records)
+
+a. Delete a specific user by ID:
+
+DELETE FROM users 
+WHERE id = 19;
+
+b. Delete all users with a specific email:
+
+DELETE FROM users 
+WHERE email = 'jane.doe@example.com';
+
+c. Delete all users with IDs greater than a certain value:
+
+DELETE FROM users 
+WHERE id > 30;
+
+d. Delete all records (clear the table):
+
+DELETE FROM users;

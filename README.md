@@ -24,3 +24,4 @@ python -m pip install --upgrade pip
     docker rm -f $(docker ps -a -q -f "name=test_loco_") # Remove all service container 
 ```
 python main.py
+pytest sources/tests/test_main.py
