@@ -27,3 +27,5 @@ python -m pip install --upgrade pip
 
      in my case (venv) D:\workspace\loco_noco_rdbms>set PYTHONPATH=%PYTHONPATH%;%CD%
     (venv) D:\workspace\loco_noco_rdbms\loco_noco>python .\tests\test_env_manager.py --start
+
+   pytest tests/test_postgres.py
