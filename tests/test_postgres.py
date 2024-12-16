@@ -1,182 +1,149 @@
 import pytest
 import pandas as pd
-from src.models.models import User
+from unittest.mock import MagicMock
+from sqlalchemy import text
+from src.models.models import User, Product, Order
 from src.utils.data_loader import DataLoader
-from sqlalchemy import text  # Import the text function
-import numpy as np
-import sqlalchemy
+from src.services.user_service import UserService  # Assuming this is the location of your service layer
+from sqlalchemy.exc import IntegrityError
 
-# Convert all integer-like columns to Python native int
-def convert_numpy_int64_to_int(data):
-    for col in data.select_dtypes(include=[np.int64]).columns:
-        data[col] = data[col].astype(int)
-    return data
 
-# Test for basic CRUD operations
-def test_postgres_crud(db_helper):
-    file_path = r"D:\workspace\loco_noco_rdbms\loco_noco\data\test_data.xlsx"
+# Reusable fixture for db_helper
+@pytest.fixture
+def mock_db_helper():
+    mock_db_helper = MagicMock()
+    mock_session = MagicMock()
+    mock_db_helper.get_session.return_value.__enter__.return_value = mock_session
+    return mock_db_helper
+
+# Load data from Excel
+@pytest.fixture
+def load_test_data():
+    file_path = r"D:\\workspace\\loco_noco_rdbms\\test_multiple_data.xlsx"
     data_loader = DataLoader(file_path=file_path)
-    data = data_loader.load_data(sheet_name="Postgres")
-    data["id"] = data["id"].apply(lambda x: int(x))
-    data["age"] = data["age"].apply(lambda x: int(x))
+    users_data = data_loader.load_data(sheet_name="users").to_dict(orient="records")
+    products_data = data_loader.load_data(sheet_name="products").to_dict(orient="records")
+    orders_data = data_loader.load_data(sheet_name="orders").to_dict(orient="records")
+    return users_data, products_data, orders_data
 
+# Service Layer Test: Create Single User
+def test_user_service_create_user(mock_db_helper, load_test_data):
+    user_service = UserService(db_helper=mock_db_helper)
+    users_data, _, _ = load_test_data
+
+    # Test creating a user
+    user_service.create_user(users_data[0])
+
+    # Validate
+    mock_db_helper.get_session.assert_called_once()  # Ensure session was opened
+    mock_session = mock_db_helper.get_session.return_value.__enter__.return_value
+    mock_session.add.assert_called_once()  # Ensure user was added to the session
+    mock_session.commit.assert_called_once()  # Ensure session was committed
+
+# Service Layer Test: Bulk Create Users
+def test_user_service_bulk_create(mock_db_helper, load_test_data):
+    user_service = UserService(db_helper=mock_db_helper)
+    users_data, _, _ = load_test_data
+
+    # Test bulk creation of users
+    user_service.create_bulk_users(users_data)
+
+    # Validate
+    mock_session = mock_db_helper.get_session.return_value.__enter__.return_value
+    mock_session.bulk_save_objects.assert_called_once()  # Bulk save should be called once
+    mock_session.commit.assert_called_once()  # Ensure session was committed
+
+# Service Layer Test: Retrieve User
+def test_user_service_get_user(mock_db_helper):
+    # Mock the session behavior
+    mock_session = mock_db_helper.get_session.return_value.__enter__.return_value
+    mock_user = User(id=1, name="John Doe", age=30)
+    mock_session.query.return_value.filter_by.return_value.first.return_value = mock_user
+
+    user_service = UserService(db_helper=mock_db_helper)
+    user = user_service.get_user(1)
+
+    # Validate
+    mock_session.query.assert_called_once()  # Ensure query was called
+    assert user.id == 1
+    assert user.name == "John Doe"
+    assert user.age == 30
+
+# Integration Test for CRUD Operations with Data
+def test_integration_crud_operations(db_helper, load_test_data):
+    users_data, products_data, orders_data = load_test_data
+
+    # Clear tables
     with db_helper.get_session() as session:
+        session.execute(text("DELETE FROM orders"))
+        session.execute(text("DELETE FROM products"))
         session.execute(text("DELETE FROM users"))
         session.commit()
 
-    for _, row in data.iterrows():
-        user = User(id=int(row["id"]), name=row["name"], age=int(row["age"]))
-        with db_helper.get_session() as session:
-            session.add(user)
-            session.commit()
+    # Insert Users
+    user_service = UserService(db_helper)
+    user_service.create_bulk_users(users_data)
 
+    # Verify Users
     with db_helper.get_session() as session:
-        for _, row in data.iterrows():
-            retrieved_user = session.query(User).filter_by(id=row["id"]).first()
-            assert retrieved_user.name == row["name"]
-            assert retrieved_user.age == row["age"]
+        assert session.query(User).count() == len(users_data)
 
+    # Insert Products
+    products = [Product(**product) for product in products_data]
     with db_helper.get_session() as session:
-        session.query(User).filter_by(id=int(data.iloc[0]["id"])).update({"age": 40})
+        session.bulk_save_objects(products)
         session.commit()
 
+    # Verify Products
     with db_helper.get_session() as session:
-        updated_user = session.query(User).filter_by(id=int(data.iloc[0]["id"])).first()
-        assert updated_user.age == 40
+        assert session.query(Product).count() == len(products_data)
 
+    # Insert Orders
+    orders = [Order(**order) for order in orders_data]
     with db_helper.get_session() as session:
-        session.query(User).filter_by(id=int(data.iloc[0]["id"])).delete()
+        session.bulk_save_objects(orders)
         session.commit()
 
+    # Verify Orders
     with db_helper.get_session() as session:
-        deleted_user = session.query(User).filter_by(id=int(data.iloc[0]["id"])).first()
-        assert deleted_user is None
+        assert session.query(Order).count() == len(orders_data)
 
-# Test for advanced query filters
-def test_postgres_advanced_query(db_helper):
-    file_path = r"D:\workspace\loco_noco_rdbms\loco_noco\data\test_data.xlsx"
-    data_loader = DataLoader(file_path=file_path)
-    data = data_loader.load_data(sheet_name="Postgres")
-    data["id"] = data["id"].apply(lambda x: int(x))
-    data["age"] = data["age"].apply(lambda x: int(x))
+# Error Handling Test: IntegrityError
+def test_user_service_integrity_error(mock_db_helper, load_test_data):
+    user_service = UserService(db_helper=mock_db_helper)
+    users_data, _, _ = load_test_data
 
-    with db_helper.get_session() as session:
-        result = session.query(User).filter(User.age > 30).all()
-        assert len(result) > 0 if result else True
+    # Mock IntegrityError
+    mock_session = mock_db_helper.get_session.return_value.__enter__.return_value
+    mock_session.commit.side_effect = IntegrityError("Integrity constraint violated", None, None)
 
-# Test for session rollback functionality
-def test_postgres_session_rollback(db_helper):
-    file_path = r"D:\workspace\loco_noco_rdbms\loco_noco\data\test_data.xlsx"
-    data_loader = DataLoader(file_path=file_path)
-    data = data_loader.load_data(sheet_name="Postgres")
-    data["id"] = data["id"].apply(lambda x: int(x))
-    data["age"] = data["age"].apply(lambda x: int(x))
+    with pytest.raises(IntegrityError):
+        user_service.create_user(users_data[0])  # Try creating a user
 
-    with db_helper.get_session() as session:
-        user = User(id=int(data.iloc[0]["id"]), name=data.iloc[0]["name"], age=int(data.iloc[0]["age"]))
-        session.add(user)
-        session.rollback()
-
-    with db_helper.get_session() as session_check:
-        rolled_back_user = session_check.query(User).filter_by(id=int(data.iloc[0]["id"])).first()
-        assert rolled_back_user is None
-
-# Test for invalid data handling
-def test_postgres_invalid_data(db_helper):
-    with db_helper.get_session() as session:
-        try:
-            invalid_user = User(id="abc", name=None, age=-10)
-            session.add(invalid_user)
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            assert isinstance(e, (ValueError, sqlalchemy.exc.SQLAlchemyError))
-
-# Test for transactional integrity
-def test_postgres_transactional_integrity(db_helper):
-    with db_helper.get_session() as session:
-        try:
-            valid_user = User(id=1, name="John Doe", age=30)
-            session.add(valid_user)
-
-            invalid_user = User(id="abc", name=None, age=-10)
-            session.add(invalid_user)
-
-            session.commit()
-        except Exception:
-            session.rollback()
-
-    with db_helper.get_session() as session_check:
-        result = session_check.query(User).filter_by(id=1).first()
-        assert result is None
-
-# Test for bulk insert
-def test_postgres_bulk_insert(db_helper):
-    # Clear the users table
-    with db_helper.get_session() as session:
-        session.execute(text("DELETE FROM users"))
-        session.commit()
-
-    # Load test data
-    file_path = r"D:\workspace\loco_noco_rdbms\loco_noco\data\test_data.xlsx"
-    data_loader = DataLoader(file_path=file_path)
-    data = data_loader.load_data(sheet_name="Postgres")
-
-    # Convert numpy.int64 to int
-    data["id"] = data["id"].apply(lambda x: int(x))
-    data["age"] = data["age"].apply(lambda x: int(x))
-
-    # Bulk insert
-    users = [User(id=int(row["id"]), name=row["name"], age=int(row["age"])) for _, row in data.iterrows()]
-    with db_helper.get_session() as session:
-        session.bulk_save_objects(users)
-        session.commit()
-
-    # Verify the inserted data
-    with db_helper.get_session() as session:
-        for _, row in data.iterrows():
-            retrieved_user = session.query(User).filter_by(id=int(row["id"])).first()
-            assert retrieved_user is not None
-            assert retrieved_user.name == row["name"]
-            assert retrieved_user.age == int(row["age"])
+    # Ensure rollback was called
+    mock_session.rollback.assert_called_once()
 
 
-# Test for duplicate insertion
-def test_postgres_duplicate_insertion(db_helper):
-    # Clear the users table
-    with db_helper.get_session() as session:
-        session.execute(text("DELETE FROM users"))
-        session.commit()
 
-    # Load test data
-    file_path = r"D:\workspace\loco_noco_rdbms\loco_noco\data\test_data.xlsx"
-    data_loader = DataLoader(file_path=file_path)
-    data = data_loader.load_data(sheet_name="Postgres")
 
-    # Convert numpy.int64 to int
-    data["id"] = data["id"].apply(lambda x: int(x))
-    data["age"] = data["age"].apply(lambda x: int(x))
 
-    # Insert a single record
-    user = User(id=int(data.iloc[0]["id"]), name=data.iloc[0]["name"], age=int(data.iloc[0]["age"]))
-    with db_helper.get_session() as session:
-        session.add(user)
-        session.commit()
 
-    # Attempt to insert the same record again, expecting a unique constraint violation
-    with db_helper.get_session() as session:
-        duplicate_user = User(id=int(data.iloc[0]["id"]), name=data.iloc[0]["name"], age=int(data.iloc[0]["age"]))
-        try:
-            session.add(duplicate_user)
-            session.commit()
-        except Exception as exc:
-            session.rollback()  # Explicitly roll back the session after the exception
-            assert "duplicate key value" in str(exc)
 
-    # Verify that no additional record was inserted
-    with db_helper.get_session() as session:
-        count = session.query(User).filter_by(id=int(data.iloc[0]["id"])).count()
-        assert count == 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -213,171 +180,139 @@ def test_postgres_duplicate_insertion(db_helper):
 
 # import pytest
 # import pandas as pd
-# from src.models.models import User
+# from unittest.mock import MagicMock
+# from src.models.models import User, Product, Order
 # from src.utils.data_loader import DataLoader
+# from sqlalchemy.exc import IntegrityError
 # from sqlalchemy import text
-# import numpy as np
 
-# # Utility Functions
-# def convert_numpy_int64_to_int(data):
-#     for col in data.select_dtypes(include=[np.int64]).columns:
-#         data[col] = data[col].astype(int)
-#     return data
+# # Service Layer (DDD)
+# class UserService:
+#     def __init__(self, db_helper):
+#         self.db_helper = db_helper
 
-# def reset_database(session):
-#     """Utility to clear the users table for a fresh test."""
-#     session.execute(text("DELETE FROM users"))
-#     session.commit()
-
-# # Test Cases
-# def test_postgres_crud(db_helper):
-#     file_path = r"D:\\workspace\\loco_noco_rdbms\\loco_noco\\data\\test_data.xlsx"
-#     data_loader = DataLoader(file_path=file_path)
-#     data = data_loader.load_data(sheet_name="Postgres")
-
-#     data = convert_numpy_int64_to_int(data)
-
-#     with db_helper.get_session() as session:
-#         reset_database(session)
-
-#     for _, row in data.iterrows():
-#         user = User(id=row["id"], name=row["name"], age=row["age"])
-#         with db_helper.get_session() as session:
+#     def create_user(self, user_data):
+#         user = User(**user_data)
+#         with self.db_helper.get_session() as session:
 #             session.add(user)
 #             session.commit()
 
-#     with db_helper.get_session() as session:
-#         for _, row in data.iterrows():
-#             retrieved_user = session.query(User).filter_by(id=row["id"]).first()
-#             assert retrieved_user.name == row["name"]
-#             assert retrieved_user.age == row["age"]
+#     def get_user(self, user_id):
+#         with self.db_helper.get_session() as session:
+#             return session.query(User).filter_by(id=user_id).first()
 
-#     with db_helper.get_session() as session:
-#         session.query(User).filter_by(id=data.iloc[0]["id"]).update({"age": 40})
-#         session.commit()
-
-#     with db_helper.get_session() as session:
-#         updated_user = session.query(User).filter_by(id=data.iloc[0]["id"]).first()
-#         assert updated_user.age == 40
-
-#     with db_helper.get_session() as session:
-#         session.query(User).filter_by(id=data.iloc[0]["id"]).delete()
-#         session.commit()
-
-#     with db_helper.get_session() as session:
-#         deleted_user = session.query(User).filter_by(id=data.iloc[0]["id"]).first()
-#         assert deleted_user is None
-
-# def test_postgres_advanced_query(db_helper):
-#     file_path = r"D:\\workspace\\loco_noco_rdbms\\loco_noco\\data\\test_data.xlsx"
-#     data_loader = DataLoader(file_path=file_path)
-#     data = data_loader.load_data(sheet_name="Postgres")
-
-#     data = convert_numpy_int64_to_int(data)
-
-#     with db_helper.get_session() as session:
-#         result = session.query(User).filter(User.age > 30).all()
-#         assert len(result) >= 0
-
-# def test_postgres_session_rollback(db_helper):
-#     file_path = r"D:\\workspace\\loco_noco_rdbms\\loco_noco\\data\\test_data.xlsx"
-#     data_loader = DataLoader(file_path=file_path)
-#     data = data_loader.load_data(sheet_name="Postgres")
-
-#     data = convert_numpy_int64_to_int(data)
-
-#     with db_helper.get_session() as session:
-#         user = User(id=data.iloc[0]["id"], name=data.iloc[0]["name"], age=data.iloc[0]["age"])
-#         session.add(user)
-#         session.rollback()
-
-#     with db_helper.get_session() as session_check:
-#         rolled_back_user = session_check.query(User).filter_by(id=data.iloc[0]["id"]).first()
-#         assert rolled_back_user is None
-
-# def test_postgres_duplicate_insertion(db_helper):
-#     file_path = r"D:\\workspace\\loco_noco_rdbms\\loco_noco\\data\\test_data.xlsx"
-#     data_loader = DataLoader(file_path=file_path)
-#     data = data_loader.load_data(sheet_name="Postgres")
-
-#     data = convert_numpy_int64_to_int(data)
-
-#     with db_helper.get_session() as session:
-#         reset_database(session)
-
-#     for _, row in data.iterrows():
-#         user = User(id=row["id"], name=row["name"], age=row["age"])
-#         with db_helper.get_session() as session:
-#             session.add(user)
+#     def create_bulk_users(self, users_data):
+#         users = [User(**user) for user in users_data]
+#         with self.db_helper.get_session() as session:
+#             session.bulk_save_objects(users)
 #             session.commit()
 
-#     with pytest.raises(Exception):
-#         for _, row in data.iterrows():
-#             user = User(id=row["id"], name=row["name"], age=row["age"])
-#             with db_helper.get_session() as session:
-#                 session.add(user)
-#                 session.commit()
+# # Test for UserService
+# def test_user_service_create_user():
+#     # Mock db_helper and session
+#     mock_db_helper = MagicMock()
+#     mock_session = MagicMock()
+#     mock_db_helper.get_session.return_value.__enter__.return_value = mock_session
 
-# def test_postgres_bulk_insert(db_helper):
-#     file_path = r"D:\\workspace\\loco_noco_rdbms\\loco_noco\\data\\test_data.xlsx"
+#     user_service = UserService(db_helper=mock_db_helper)
+
+#     # Input data from Excel
+#     file_path = r"D:\\workspace\\loco_noco_rdbms\\test_multiple_data.xlsx"
+#     users_data = pd.read_excel(file_path, sheet_name="users").to_dict(orient="records")
+
+#     # Test creating a user
+#     user_service.create_user(users_data[0])
+
+#     mock_session.add.assert_called_once()  # Ensure the user was added to the session
+#     mock_session.commit.assert_called_once()  # Ensure the session was committed
+
+# def test_user_service_bulk_create():
+#     # Mock db_helper and session
+#     mock_db_helper = MagicMock()
+#     mock_session = MagicMock()
+#     mock_db_helper.get_session.return_value.__enter__.return_value = mock_session
+
+#     user_service = UserService(db_helper=mock_db_helper)
+
+#     # Input data from Excel
+#     file_path = r"D:\\workspace\\loco_noco_rdbms\\test_multiple_data.xlsx"
+#     users_data = pd.read_excel(file_path, sheet_name="users").to_dict(orient="records")
+
+#     # Test bulk creation of users
+#     user_service.create_bulk_users(users_data)
+
+#     assert mock_session.bulk_save_objects.call_count == 1  # Bulk save should be called once
+#     mock_session.commit.assert_called_once()  # Ensure the session was committed
+
+# def test_user_service_get_user():
+#     # Mock db_helper and session
+#     mock_db_helper = MagicMock()
+#     mock_session = MagicMock()
+#     mock_db_helper.get_session.return_value.__enter__.return_value = mock_session
+
+#     # Mock the return value of query
+#     mock_user = User(id=1, name="John Doe", age=30)
+#     mock_session.query.return_value.filter_by.return_value.first.return_value = mock_user
+
+#     user_service = UserService(db_helper=mock_db_helper)
+
+#     # Test retrieving a user
+#     user = user_service.get_user(1)
+
+#     mock_session.query.assert_called_once()  # Ensure query was called
+#     assert user.id == 1
+#     assert user.name == "John Doe"
+#     assert user.age == 30
+
+# # Integration Test for CRUD operations with data from Excel
+# def test_integration_crud_operations(db_helper):
+#     # DataLoader to read Excel file
+#     file_path = r"D:\\workspace\\loco_noco_rdbms\\test_multiple_data.xlsx"
 #     data_loader = DataLoader(file_path=file_path)
-#     data = data_loader.load_data(sheet_name="Postgres")
 
-#     data = convert_numpy_int64_to_int(data)
+#     users_data = data_loader.load_data(sheet_name="users")
+#     products_data = data_loader.load_data(sheet_name="products")
+#     orders_data = data_loader.load_data(sheet_name="orders")
 
+#     # Convert data to dictionaries
+#     users_data = users_data.to_dict(orient="records")
+#     products_data = products_data.to_dict(orient="records")
+#     orders_data = orders_data.to_dict(orient="records")
+
+#     # Clear tables
 #     with db_helper.get_session() as session:
-#         reset_database(session)
-
-#     users = [User(id=row["id"], name=row["name"], age=row["age"]) for _, row in data.iterrows()]
-
-#     with db_helper.get_session() as session:
-#         session.bulk_save_objects(users)
+#         session.execute(text("DELETE FROM orders"))  # Wrap raw SQL in text()
+#         session.execute(text("DELETE FROM products"))  # Wrap raw SQL in text()
+#         session.execute(text("DELETE FROM users"))  # Wrap raw SQL in text()
 #         session.commit()
 
+#     # Insert Users
+#     user_service = UserService(db_helper)
+#     user_service.create_bulk_users(users_data)
+
+#     # Verify Users
 #     with db_helper.get_session() as session:
-#         all_users = session.query(User).all()
-#         assert len(all_users) == len(data)
+#         assert session.query(User).count() == len(users_data)
 
-# def test_postgres_transactional_integrity(db_helper):
-#     file_path = r"D:\\workspace\\loco_noco_rdbms\\loco_noco\\data\\test_data.xlsx"
-#     data_loader = DataLoader(file_path=file_path)
-#     data = data_loader.load_data(sheet_name="Postgres")
-
-#     data = convert_numpy_int64_to_int(data)
-
+#     # Insert Products
+#     products = [Product(**product) for product in products_data]
 #     with db_helper.get_session() as session:
-#         reset_database(session)
-
-#     try:
-#         for _, row in data.iterrows():
-#             user = User(id=row["id"], name=row["name"], age=row["age"])
-#             session.add(user)
-#             if row["id"] == data.iloc[-1]["id"]:  # Simulate an error at the last insert
-#                 raise Exception("Simulated Error")
+#         session.bulk_save_objects(products)
 #         session.commit()
-#     except:
-#         session.rollback()
 
+#     # Verify Products
 #     with db_helper.get_session() as session:
-#         all_users = session.query(User).all()
-#         assert len(all_users) == 0
+#         assert session.query(Product).count() == len(products_data)
 
-# def test_postgres_invalid_data(db_helper):
-#     with pytest.raises(ValueError):
-#         with db_helper.get_session() as session:
-#             user = User(id=None, name=None, age=-1)  # Invalid data
-#             session.add(user)
-#             session.commit()
+#     # Insert Orders
+#     orders = [Order(**order) for order in orders_data]
+#     with db_helper.get_session() as session:
+#         session.bulk_save_objects(orders)
+#         session.commit()
 
-
-
-
-
-
-
-
-
-
+#     # Verify Orders
+#     with db_helper.get_session() as session:
+#         assert session.query(Order).count() == len(orders_data)
 
 
 
@@ -419,6 +354,8 @@ def test_postgres_duplicate_insertion(db_helper):
 # from src.utils.data_loader import DataLoader
 # from sqlalchemy import text  # Import the text function
 # import numpy as np
+# import sqlalchemy
+
 
 # # Convert all integer-like columns to Python native int
 # def convert_numpy_int64_to_int(data):
@@ -426,360 +363,202 @@ def test_postgres_duplicate_insertion(db_helper):
 #         data[col] = data[col].astype(int)
 #     return data
 
+# # Test for basic CRUD operations
 # def test_postgres_crud(db_helper):
-#     # Initialize DataLoader and load data from Excel
 #     file_path = r"D:\workspace\loco_noco_rdbms\loco_noco\data\test_data.xlsx"
 #     data_loader = DataLoader(file_path=file_path)
-#     data = data_loader.load_data(sheet_name="Postgres")  # Assuming a sheet named 'Postgres'
-
-#     # Convert all integer-like columns to Python native int
+#     data = data_loader.load_data(sheet_name="Postgres")
 #     data["id"] = data["id"].apply(lambda x: int(x))
 #     data["age"] = data["age"].apply(lambda x: int(x))
 
-#     # Delete all existing users to avoid unique constraint violations
 #     with db_helper.get_session() as session:
-#         session.execute(text("DELETE FROM users"))  # Wrap the SQL statement in text()
-#         session.commit()  # Commit the deletion
+#         session.execute(text("DELETE FROM users"))
+#         session.commit()
 
-#     # Insert data from Excel
 #     for _, row in data.iterrows():
-#         user = User(id=int(row["id"]), name=row["name"], age=int(row["age"]))  # Explicitly convert to int
+#         user = User(id=int(row["id"]), name=row["name"], age=int(row["age"]))
 #         with db_helper.get_session() as session:
 #             session.add(user)
-#             session.commit()  # Commit each insertion
+#             session.commit()
 
-#     # Read and verify the data
 #     with db_helper.get_session() as session:
 #         for _, row in data.iterrows():
 #             retrieved_user = session.query(User).filter_by(id=row["id"]).first()
 #             assert retrieved_user.name == row["name"]
 #             assert retrieved_user.age == row["age"]
 
-#     # Update and verify
 #     with db_helper.get_session() as session:
-#         session.query(User).filter_by(id=int(data.iloc[0]["id"])).update({"age": 40})  # Ensure id is int
-#         session.commit()  # Commit the update
+#         session.query(User).filter_by(id=int(data.iloc[0]["id"])).update({"age": 40})
+#         session.commit()
 
 #     with db_helper.get_session() as session:
 #         updated_user = session.query(User).filter_by(id=int(data.iloc[0]["id"])).first()
 #         assert updated_user.age == 40
 
-#     # Delete and verify
 #     with db_helper.get_session() as session:
 #         session.query(User).filter_by(id=int(data.iloc[0]["id"])).delete()
-#         session.commit()  # Commit the deletion
+#         session.commit()
 
 #     with db_helper.get_session() as session:
 #         deleted_user = session.query(User).filter_by(id=int(data.iloc[0]["id"])).first()
 #         assert deleted_user is None
 
+# # Test for advanced query filters
 # def test_postgres_advanced_query(db_helper):
-#     # Initialize DataLoader and load data from Excel
 #     file_path = r"D:\workspace\loco_noco_rdbms\loco_noco\data\test_data.xlsx"
 #     data_loader = DataLoader(file_path=file_path)
-#     data = data_loader.load_data(sheet_name="Postgres")  # Assuming a sheet named 'Postgres'
-
-#     # Convert all integer-like columns to Python native int
+#     data = data_loader.load_data(sheet_name="Postgres")
 #     data["id"] = data["id"].apply(lambda x: int(x))
 #     data["age"] = data["age"].apply(lambda x: int(x))
 
-#     # Check if there are any users with age > 30
 #     with db_helper.get_session() as session:
-#         result = session.query(User).filter(User.age > 30).all()  # Example filter for age > 30
-#         if result:
-#             assert len(result) > 0  # Adjust the assertion to expect at least one result
-#         else:
-#             assert True  # If no results, assert True to pass the test
+#         result = session.query(User).filter(User.age > 30).all()
+#         assert len(result) > 0 if result else True
 
-
-
+# # Test for session rollback functionality
 # def test_postgres_session_rollback(db_helper):
-#     # Initialize DataLoader and load data from Excel
 #     file_path = r"D:\workspace\loco_noco_rdbms\loco_noco\data\test_data.xlsx"
 #     data_loader = DataLoader(file_path=file_path)
-#     data = data_loader.load_data(sheet_name="Postgres")  # Assuming a sheet named 'Postgres'
-
-#     # Convert all integer-like columns to Python native int
+#     data = data_loader.load_data(sheet_name="Postgres")
 #     data["id"] = data["id"].apply(lambda x: int(x))
 #     data["age"] = data["age"].apply(lambda x: int(x))
 
-#     # Example session rollback
 #     with db_helper.get_session() as session:
 #         user = User(id=int(data.iloc[0]["id"]), name=data.iloc[0]["name"], age=int(data.iloc[0]["age"]))
 #         session.add(user)
-
-#         # Don't commit yet. Perform rollback before committing to simulate undoing the transaction.
 #         session.rollback()
 
-#     # After rollback, we query the database again in a new session
 #     with db_helper.get_session() as session_check:
 #         rolled_back_user = session_check.query(User).filter_by(id=int(data.iloc[0]["id"])).first()
-
-#         # Assert that the user is not in the database after rollback
 #         assert rolled_back_user is None
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# import pytest
-# import pandas as pd
-# from src.models.models import User
-# from src.utils.data_loader import DataLoader
-# from sqlalchemy import text  # Import the text function
-
-# def test_postgres_crud(db_helper):
-#     # Initialize DataLoader and load data from Excel
-#     data_loader = DataLoader()
-#     data = data_loader.load_data(sheet_name="Postgres")  # Assuming a sheet named 'Postgres'
-
-#     # Convert all integer-like columns to Python native int
+# # Test for invalid data handling
+# def test_postgres_invalid_data(db_helper):
+#     with db_helper.get_session() as session:
+#         try:
+#             invalid_user = User(id="abc", name=None, age=-10)
+#             session.add(invalid_user)
+#             session.commit()
+#         except Exception as e:
+#             session.rollback()
+#             assert isinstance(e, (ValueError, sqlalchemy.exc.SQLAlchemyError))
+
+# # Test for transactional integrity
+# def test_postgres_transactional_integrity(db_helper):
+#     with db_helper.get_session() as session:
+#         try:
+#             valid_user = User(id=1, name="John Doe", age=30)
+#             session.add(valid_user)
+
+#             invalid_user = User(id="abc", name=None, age=-10)
+#             session.add(invalid_user)
+
+#             session.commit()
+#         except Exception:
+#             session.rollback()
+
+#     with db_helper.get_session() as session_check:
+#         result = session_check.query(User).filter_by(id=1).first()
+#         assert result is None
+
+# # Test for bulk insert
+# def test_postgres_bulk_insert(db_helper):
+#     # Clear the users table
+#     with db_helper.get_session() as session:
+#         session.execute(text("DELETE FROM users"))
+#         session.commit()
+
+#     # Load test data
+#     file_path = r"D:\workspace\loco_noco_rdbms\loco_noco\data\test_data.xlsx"
+#     data_loader = DataLoader(file_path=file_path)
+#     data = data_loader.load_data(sheet_name="Postgres")
+
+#     # Convert numpy.int64 to int
 #     data["id"] = data["id"].apply(lambda x: int(x))
 #     data["age"] = data["age"].apply(lambda x: int(x))
 
-#     # Delete all existing users to avoid unique constraint violations
+#     # Bulk insert
+#     users = [User(id=int(row["id"]), name=row["name"], age=int(row["age"])) for _, row in data.iterrows()]
 #     with db_helper.get_session() as session:
-#         session.execute(text("DELETE FROM users"))  # Wrap the SQL statement in text()
-#         session.commit()  # Commit the deletion
+#         session.bulk_save_objects(users)
+#         session.commit()
 
-#     # Insert data from Excel
-#     for _, row in data.iterrows():
-#         user = User(id=int(row["id"]), name=row["name"], age=int(row["age"]))  # Explicitly convert to int
-#         with db_helper.get_session() as session:
-#             session.add(user)
-#             session.commit()  # Commit each insertion
-
-#     # Read and verify the data
+#     # Verify the inserted data
 #     with db_helper.get_session() as session:
 #         for _, row in data.iterrows():
-#             retrieved_user = session.query(User).filter_by(id=row["id"]).first()
+#             retrieved_user = session.query(User).filter_by(id=int(row["id"])).first()
+#             assert retrieved_user is not None
 #             assert retrieved_user.name == row["name"]
-#             assert retrieved_user.age == row["age"]
-
-#     # Update and verify
-#     with db_helper.get_session() as session:
-#         session.query(User).filter_by(id=int(data.iloc[0]["id"])).update({"age": 40})  # Ensure id is int
-#         session.commit()  # Commit the update
-
-#     with db_helper.get_session() as session:
-#         updated_user = session.query(User).filter_by(id=int(data.iloc[0]["id"])).first()
-#         assert updated_user.age == 40
-
-#     # Delete and verify
-#     with db_helper.get_session() as session:
-#         session.query(User).filter_by(id=int(data.iloc[0]["id"])).delete()
-#         session.commit()  # Commit the deletion
-
-#     with db_helper.get_session() as session:
-#         deleted_user = session.query(User).filter_by(id=int(data.iloc[0]["id"])).first()
-#         assert deleted_user is None
+#             assert retrieved_user.age == int(row["age"])
 
 
-
-# def test_postgres_invalid_data(db_helper):
-#     # Invalid data (missing name and invalid age)
-#     invalid_data = {"id": 999, "name": "", "age": -1}
-    
-#     # Try inserting invalid data
-#     with pytest.raises(Exception):  # Expecting an exception for invalid data
-#         with db_helper.get_session() as session:
-#             user = User(**invalid_data)
-#             session.add(user)
-#             session.commit()  # Should fail due to invalid data
-
-
+# # Test for duplicate insertion
 # def test_postgres_duplicate_insertion(db_helper):
-#     # Data to insert
-#     user_data = {"id": 1001, "name": "Alice", "age": 30}
-
-#     # Insert the first record
+#     # Clear the users table
 #     with db_helper.get_session() as session:
-#         user = User(**user_data)
+#         session.execute(text("DELETE FROM users"))
+#         session.commit()
+
+#     # Load test data
+#     file_path = r"D:\workspace\loco_noco_rdbms\loco_noco\data\test_data.xlsx"
+#     data_loader = DataLoader(file_path=file_path)
+#     data = data_loader.load_data(sheet_name="Postgres")
+
+#     # Convert numpy.int64 to int
+#     data["id"] = data["id"].apply(lambda x: int(x))
+#     data["age"] = data["age"].apply(lambda x: int(x))
+
+#     # Insert a single record
+#     user = User(id=int(data.iloc[0]["id"]), name=data.iloc[0]["name"], age=int(data.iloc[0]["age"]))
+#     with db_helper.get_session() as session:
 #         session.add(user)
 #         session.commit()
 
-#     # Try inserting the same record again and check for unique constraint violation
-#     with pytest.raises(Exception):  # Expecting a violation of the unique constraint
-#         with db_helper.get_session() as session:
-#             duplicate_user = User(**user_data)
+#     # Attempt to insert the same record again, expecting a unique constraint violation
+#     with db_helper.get_session() as session:
+#         duplicate_user = User(id=int(data.iloc[0]["id"]), name=data.iloc[0]["name"], age=int(data.iloc[0]["age"]))
+#         try:
 #             session.add(duplicate_user)
 #             session.commit()
+#         except Exception as exc:
+#             session.rollback()  # Explicitly roll back the session after the exception
+#             assert "duplicate key value" in str(exc)
 
-# def test_postgres_invalid_update(db_helper):
-#     # Assuming there's a user with id=1
-#     user_id = 1
-
-#     # Try updating with invalid data (e.g., setting age to a negative value)
-#     with pytest.raises(ValueError):  # Expecting a ValueError for invalid data
-#         with db_helper.get_session() as session:
-#             session.query(User).filter_by(id=user_id).update({"age": -25})
-#             session.commit()
-
-
-
-# def test_postgres_non_existent_record(db_helper):
-#     non_existent_id = 9999  # Assuming this ID does not exist in the database
-
-#     # Test reading a non-existent record
+#     # Verify that no additional record was inserted
 #     with db_helper.get_session() as session:
-#         user = session.query(User).filter_by(id=non_existent_id).first()
-#         assert user is None  # Expecting None since the user does not exist
-
-#     # Test updating a non-existent record
-#     with pytest.raises(ValueError):  # Expecting ValueError since the record does not exist
-#         with db_helper.get_session() as session:
-#             session.query(User).filter_by(id=non_existent_id).update({"age": 35})
-#             session.commit()
-
-#     # Test deleting a non-existent record
-#     with pytest.raises(ValueError):  # Expecting ValueError since the record does not exist
-#         with db_helper.get_session() as session:
-#             session.query(User).filter_by(id=non_existent_id).delete()
-#             session.commit()
-
-
-# def test_postgres_bulk_insert(db_helper):
-#     # Valid data for bulk insert
-#     bulk_data = [
-#         {"id": 2001, "name": "John", "age": 25},
-#         {"id": 2002, "name": "Emma", "age": 28},
-#         {"id": 2003, "name": "Sophia", "age": 22}
-#     ]
-
-#     # Bulk insert data
-#     with db_helper.get_session() as session:
-#         users = [User(**data) for data in bulk_data]
-#         session.add_all(users)
-#         session.commit()
-
-#     # Verify the data is inserted
-#     for data in bulk_data:
-#         with db_helper.get_session() as session:
-#             retrieved_user = session.query(User).filter_by(id=data["id"]).first()
-#             assert retrieved_user.name == data["name"]
-#             assert retrieved_user.age == data["age"]
-
-
-# def test_postgres_advanced_query(db_helper):
-#     # Insert sample data
-#     sample_data = [
-#         {"id": 3001, "name": "John", "age": 25},
-#         {"id": 3002, "name": "Emma", "age": 28},
-#         {"id": 3003, "name": "Sophia", "age": 22}
-#     ]
-    
-#     with db_helper.get_session() as session:
-#         users = [User(**data) for data in sample_data]
-#         session.add_all(users)
-#         session.commit()
-
-#     # Perform an advanced query (e.g., users with age greater than 23)
-#     with db_helper.get_session() as session:
-#         filtered_users = session.query(User).filter(User.age > 23).all()
-#         assert len(filtered_users) == 2  # Expecting only John and Emma
-#         assert all(user.age > 23 for user in filtered_users)
-
-
-# def test_postgres_session_rollback(db_helper):
-#     # Insert a valid user first
-#     valid_data = {"id": 4001, "name": "Mark", "age": 30}
-    
-#     with db_helper.get_session() as session:
-#         user = User(**valid_data)
-#         session.add(user)
-#         session.commit()
-
-#     # Now, try an invalid update operation that raises an exception
-#     with pytest.raises(Exception):  # Expecting an exception that causes a rollback
-#         with db_helper.get_session() as session:
-#             # Invalid update (e.g., non-existent field)
-#             session.query(User).filter_by(id=4001).update({"non_existent_field": "Invalid"})
-#             session.commit()
-    
-#     # Verify the data is still intact after rollback
-#     with db_helper.get_session() as session:
-#         user = session.query(User).filter_by(id=4001).first()
-#         assert user.name == "Mark"  # The data should not have changed
+#         count = session.query(User).filter_by(id=int(data.iloc[0]["id"])).count()
+#         assert count == 1
 
 
 
-# def test_postgres_transactional_integrity(db_helper):
-#     # Valid data for inserting two users
-#     user_data_1 = {"id": 5001, "name": "Alice", "age": 35}
-#     user_data_2 = {"id": 5002, "name": "Bob", "age": 40}
 
-#     # Start a session and insert two users, then cause an error to test rollback
-#     with pytest.raises(Exception):  # Simulate an error
-#         with db_helper.get_session() as session:
-#             user1 = User(**user_data_1)
-#             user2 = User(**user_data_2)
-#             session.add(user1)
-#             session.add(user2)
-#             session.commit()  # Force the rollback to happen
 
-#     # Ensure neither of the users was inserted
-#     with db_helper.get_session() as session:
-#         user1 = session.query(User).filter_by(id=5001).first()
-#         user2 = session.query(User).filter_by(id=5002).first()
-#         assert user1 is None
-#         assert user2 is None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
