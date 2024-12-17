@@ -1,102 +1,143 @@
-from contextlib import contextmanager
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
-from sqlalchemy.exc import IntegrityError
-from src.models.models import User  # Assuming the User model is imported from models
+from sqlalchemy.orm import sessionmaker
 
 class RDBMSHelper:
     def __init__(self, db_url):
-        """
-        Initialize the RDBMS helper with a database URL.
-        :param db_url: Database connection string
-        """
         self.engine = create_engine(db_url)
         self.Session = sessionmaker(bind=self.engine)
 
-    @contextmanager
-    def get_session(self):
-        """
-        Provide a database session for operations.
-        """
-        session = self.Session()
-        try:
-            yield session
-            session.commit()
-        except Exception as e:
-            session.rollback()
-            raise
-        finally:
-            session.close()
-
     def create_all_tables(self, base):
         """
-        Create all tables defined in the SQLAlchemy Base.
-        :param base: SQLAlchemy declarative Base object
+        Create all tables based on the Base metadata.
         """
         base.metadata.create_all(self.engine)
 
     def drop_all_tables(self, base):
         """
-        Drop all tables defined in the SQLAlchemy Base.
-        :param base: SQLAlchemy declarative Base object
+        Drop all tables based on the Base metadata.
         """
         base.metadata.drop_all(self.engine)
 
-    # CRUD Operations
+    def get_session(self):
+        """
+        Provide a session for database operations.
+        """
+        return self.Session()
 
-    def create_user(self, user_data):
-        """Create a new user."""
-        with self.get_session() as session:
-            try:
-                user = User(**user_data)
-                session.add(user)
-                session.commit()
-            except IntegrityError as e:
-                session.rollback()
-                raise ValueError("Error creating user: Integrity Error") from e
-            except Exception as e:
-                session.rollback()
-                raise ValueError("Error creating user") from e
 
-    def get_user(self, user_id):
-        """Retrieve a user by ID."""
-        with self.get_session() as session:
-            user = session.query(User).filter_by(id=user_id).first()
-            return user
 
-    def update_user(self, user_id, updated_data):
-        """Update an existing user."""
-        with self.get_session() as session:
-            user = session.query(User).filter_by(id=user_id).first()
-            if not user:
-                raise ValueError(f"User with ID {user_id} not found")
+
+
+
+
+
+
+
+
+
+
+
+
+
+# from contextlib import contextmanager
+# from sqlalchemy.orm import sessionmaker
+# from sqlalchemy import create_engine
+# from sqlalchemy.exc import IntegrityError
+# from src.models.models import User  # Assuming the User model is imported from models
+
+# class RDBMSHelper:
+#     def __init__(self, db_url):
+#         """
+#         Initialize the RDBMS helper with a database URL.
+#         :param db_url: Database connection string
+#         """
+#         self.engine = create_engine(db_url)
+#         self.Session = sessionmaker(bind=self.engine)
+
+#     @contextmanager
+#     def get_session(self):
+#         """
+#         Provide a database session for operations.
+#         """
+#         session = self.Session()
+#         try:
+#             yield session
+#             session.commit()
+#         except Exception as e:
+#             session.rollback()
+#             raise
+#         finally:
+#             session.close()
+
+#     def create_all_tables(self, base):
+#         """
+#         Create all tables defined in the SQLAlchemy Base.
+#         :param base: SQLAlchemy declarative Base object
+#         """
+#         base.metadata.create_all(self.engine)
+
+#     def drop_all_tables(self, base):
+#         """
+#         Drop all tables defined in the SQLAlchemy Base.
+#         :param base: SQLAlchemy declarative Base object
+#         """
+#         base.metadata.drop_all(self.engine)
+
+#     # CRUD Operations
+
+#     def create_user(self, user_data):
+#         """Create a new user."""
+#         with self.get_session() as session:
+#             try:
+#                 user = User(**user_data)
+#                 session.add(user)
+#                 session.commit()
+#             except IntegrityError as e:
+#                 session.rollback()
+#                 raise ValueError("Error creating user: Integrity Error") from e
+#             except Exception as e:
+#                 session.rollback()
+#                 raise ValueError("Error creating user") from e
+
+#     def get_user(self, user_id):
+#         """Retrieve a user by ID."""
+#         with self.get_session() as session:
+#             user = session.query(User).filter_by(id=user_id).first()
+#             return user
+
+#     def update_user(self, user_id, updated_data):
+#         """Update an existing user."""
+#         with self.get_session() as session:
+#             user = session.query(User).filter_by(id=user_id).first()
+#             if not user:
+#                 raise ValueError(f"User with ID {user_id} not found")
             
-            for key, value in updated_data.items():
-                setattr(user, key, value)
+#             for key, value in updated_data.items():
+#                 setattr(user, key, value)
 
-            try:
-                session.commit()
-            except IntegrityError as e:
-                session.rollback()
-                raise ValueError("Error updating user: Integrity Error") from e
-            except Exception as e:
-                session.rollback()
-                raise ValueError("Error updating user") from e
+#             try:
+#                 session.commit()
+#             except IntegrityError as e:
+#                 session.rollback()
+#                 raise ValueError("Error updating user: Integrity Error") from e
+#             except Exception as e:
+#                 session.rollback()
+#                 raise ValueError("Error updating user") from e
 
-    def delete_user(self, user_id):
-        """Delete a user by ID."""
-        with self.get_session() as session:
-            user = session.query(User).filter_by(id=user_id).first()
-            if not user:
-                raise ValueError(f"User with ID {user_id} not found")
-            session.delete(user)
-            session.commit()
+#     def delete_user(self, user_id):
+#         """Delete a user by ID."""
+#         with self.get_session() as session:
+#             user = session.query(User).filter_by(id=user_id).first()
+#             if not user:
+#                 raise ValueError(f"User with ID {user_id} not found")
+#             session.delete(user)
+#             session.commit()
 
-    def get_all_users(self):
-        """Retrieve all users."""
-        with self.get_session() as session:
-            users = session.query(User).all()
-            return users
+#     def get_all_users(self):
+#         """Retrieve all users."""
+#         with self.get_session() as session:
+#             users = session.query(User).all()
+#             return users
 
 
 
