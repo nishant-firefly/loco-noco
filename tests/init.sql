@@ -97,20 +97,19 @@ INSERT INTO stock_updates (product_id, change_quantity, reason) VALUES
 
 
 
--- -- Create orders table
--- CREATE TABLE IF NOT EXISTS orders (
---     id SERIAL PRIMARY KEY,
---     product_id INT NOT NULL,
---     quantity INT NOT NULL,
---     total DECIMAL NOT NULL
--- );
 
--- -- Create users table
--- CREATE TABLE IF NOT EXISTS users (
---     id SERIAL PRIMARY KEY,
---     name VARCHAR(100),
---     email VARCHAR(255) UNIQUE NOT NULL
--- );
+
+-- Create table for users
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100),
+    email VARCHAR(255) UNIQUE NOT NULL
+);
+
+-- Insert initial data into users table
+INSERT INTO users (id, name, email) VALUES
+(1, 'Alice', 'alice@example.com'),
+(2, 'Bob', 'bob@example.com');
 
 
 
