@@ -1,0 +1,72 @@
+{
+  "operations": [
+    {
+      "operation": "create",
+      "table": "product",
+      "data": {
+        "id": 1,
+        "name": "Laptop",
+        "price": 1200,
+        "quantity": 10
+      },
+      "expected_assertions": {
+        "query": "SELECT * FROM product WHERE id = 1",
+        "result": [
+          {
+            "id": 1,
+            "name": "Laptop",
+            "price": 1200,
+            "quantity": 10
+          }
+        ]
+      }
+    },
+    {
+      "operation": "update",
+      "table": "product",
+      "data": {
+        "id": 1,
+        "name": "Gaming Laptop",
+        "price": 1500,
+        "quantity": 5
+      },
+      "expected_assertions": {
+        "query": "SELECT * FROM product WHERE id = 1",
+        "result": [
+          {
+            "id": 1,
+            "name": "Gaming Laptop",
+            "price": 1500,
+            "quantity": 5
+          }
+        ]
+      }
+    },
+    {
+      "operation": "delete",
+      "table": "product",
+      "data": {
+        "id": 1
+      },
+      "expected_assertions": {
+        "query": "SELECT * FROM product WHERE id = 1",
+        "result": []
+      }
+    },
+    {
+      "operation": "read",
+      "table": "product",
+      "expected_assertions": {
+        "query": "SELECT * FROM product",
+        "result": [
+          {
+            "id": 2,
+            "name": "Phone",
+            "price": 800,
+            "quantity": 15
+          }
+        ]
+      }
+    }
+  ]
+}
