@@ -1,0 +1,19 @@
+{
+  "admin": {
+    "product": ["*"],
+    "category": ["*"],
+    "users": ["*"],
+    "order": ["*"],
+    "product_category": ["*"]
+  },
+  "user": {
+    "product": ["id", "name", "price"],
+    "category": ["id", "name"],
+    "users": ["id", "name", "email"]
+  },
+  "guest": {
+    "product": ["id", "name"],
+    "category": [],
+    "users": []
+  }
+}

@@ -1,0 +1,9 @@
+# Python dependencies
+pytest
+sqlalchemy
+pandas
+psycopg2-binary
+docker
+openpyxl
+numpy
+flask

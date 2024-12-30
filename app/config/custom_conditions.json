@@ -1,0 +1,14 @@
+{
+    "user": {
+      "product": "is_active = 1",
+      "users": "is_verified = 1"
+    },
+    "admin": {
+      "users": null
+    },
+    "guest": {
+      "product": "is_active = 1",
+      "users": ""
+    }
+  }
+  

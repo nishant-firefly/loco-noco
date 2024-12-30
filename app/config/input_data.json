@@ -1,0 +1,180 @@
+{
+    "operations": [
+      {
+        "operation": "update",
+        "table": "product",
+        "data": {
+          "id": 1,
+          "name": "Gaming Laptop",
+          "price": 1500,
+          "quantity": 5
+        },
+        "expected_assertions": {
+          "operation": "select",
+          "table": "product",
+          "clause": { "id": 1 },
+          "result": [
+            {
+              "id": 1,
+              "name": "Gaming Laptop",
+              "price": 1500,
+              "quantity": 5
+            }
+          ]
+        }
+      },
+      {
+        "operation": "delete",
+        "table": "product",
+        "data": {
+          "id": 1
+        },
+        "expected_assertions": {
+          "operation": "select",
+          "table": "product",
+          "clause": { "id": 1 },
+          "result": []
+        }
+      },
+      {
+        "operation": "select",
+        "table": "product",
+        "expected_assertions": {
+          "query": "SELECT id, name, price, quantity FROM product WHERE price > 500",
+          "result": [
+            {
+              "id": 2,
+              "name": "Phone",
+              "price": 800,
+              "quantity": 15
+            }
+          ]
+        }
+      },
+      {
+        "operation": "select",
+        "table": "product",
+        "expected_assertions": {
+          "query": "SELECT COUNT(*) AS total_products FROM product",
+          "result": [
+            {
+              "total_products": 1
+            }
+          ]
+        }
+      },
+      {
+        "operation": "select",
+        "table": "product",
+        "expected_assertions": {
+          "query": "SELECT AVG(price) AS average_price FROM product",
+          "result": [
+            {
+              "average_price": 800
+            }
+          ]
+        }
+      },
+      {
+        "operation": "select",
+        "table": "product",
+        "expected_assertions": {
+          "query": "SELECT MAX(price) AS max_price, MIN(price) AS min_price FROM product",
+          "result": [
+            {
+              "max_price": 1500,
+              "min_price": 800
+            }
+          ]
+        }
+      },
+      {
+        "operation": "create",
+        "table": "user",
+        "data": {
+          "id": 1,
+          "name": "John Doe",
+          "email": "john@example.com"
+        },
+        "expected_assertions": {
+          "operation": "select",
+          "table": "user",
+          "clause": { "id": 1 },
+          "result": [
+            {
+              "id": 1,
+              "name": "John Doe",
+              "email": "john@example.com"
+            }
+          ]
+        }
+      },
+      {
+        "operation": "select",
+        "table": "user",
+        "expected_assertions": {
+          "query": "SELECT COUNT(*) AS total_users FROM user",
+          "result": [
+            {
+              "total_users": 1
+            }
+          ]
+        }
+      },
+      {
+        "operation": "select",
+        "table": "order",
+        "expected_assertions": {
+          "query": "SELECT order.id, user.name AS user_name, order.total_price FROM order INNER JOIN user ON order.user_id = user.id",
+          "result": [
+            {
+              "id": 1,
+              "user_name": "John Doe",
+              "total_price": 1500
+            }
+          ]
+        }
+      },
+      {
+        "operation": "select",
+        "table": "order",
+        "expected_assertions": {
+          "query": "SELECT order.id, order.total_price, COUNT(order_product.product_id) AS total_products FROM order LEFT JOIN order_product ON order.id = order_product.order_id GROUP BY order.id",
+          "result": [
+            {
+              "id": 1,
+              "total_price": 1500,
+              "total_products": 1
+            }
+          ]
+        }
+      },
+      {
+        "operation": "select",
+        "table": "category",
+        "expected_assertions": {
+          "query": "SELECT * FROM category WHERE name LIKE '%Electronics%'",
+          "result": [
+            {
+              "id": 1,
+              "name": "Electronics"
+            }
+          ]
+        }
+      },
+      {
+        "operation": "select",
+        "table": "product_category",
+        "expected_assertions": {
+            "query": "SELECT product_id, category_id FROM product_category WHERE product_id = 2",
+            "result": [
+                {
+                    "product_id": 2,
+                    "category_id": 1
+                }
+            ]
+        }
+    }
+    
+    ]
+  }
