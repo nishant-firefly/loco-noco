@@ -1,0 +1,7 @@
+fastapi==0.104.1
+pydantic==2.6.4
+sqlalchemy==2.0.29
+elasticsearch==8.11.1
+psycopg2-binary==2.9.9
+uvicorn==0.27.0.post1
+python-dotenv==1.0.1

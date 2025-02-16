@@ -1,0 +1,33 @@
+version: '3'
+services:
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5432:5432"
+    restart: always
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.1
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    restart: always
+
+  app:
+    build: .
+    depends_on:
+      - db
+      - elasticsearch
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://user:password@db:5432/mydatabase
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+    restart: always
