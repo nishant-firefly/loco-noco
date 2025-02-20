@@ -13,6 +13,9 @@ pip install -r requirements.txt
 alembic revision --autogenerate -m "Initial migration"
 alembic upgrade head
 
+## start docker
+docker-compose up --build -d
+
 
  ## Run FastAPI Server **
 uvicorn main:app --reload
