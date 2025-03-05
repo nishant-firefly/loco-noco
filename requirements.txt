@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+psycopg2-binary  # PostgreSQL adapter (remove if not using PostgreSQL)
+pymysql  # MySQL adapter (remove if not using MySQL)
+pyodbc  # MSSQL adapter (remove if not using MSSQL)
+cx_Oracle  # Oracle DB adapter (remove if not using Oracle)
+elasticsearch  # Elasticsearch client
+python-dotenv  # Environment variable management
+alembic  # Database migrations

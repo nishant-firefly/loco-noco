@@ -1,0 +1,93 @@
+services:
+  postgres:
+    image: postgres:13
+    container_name: test_loco_noco_postgres
+    environment:
+      POSTGRES_USER: test_user
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: test_db
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test_user -d test_db -p 5432"]
+      interval: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.5"
+
+  mysql:
+    image: mysql:8
+    container_name: test_loco_noco_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: test_db
+    ports:
+      - "3306:3306"
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 256m
+          cpus: "0.5"
+
+  oracle:
+    image: gvenzl/oracle-xe:21-slim
+    container_name: test_loco_noco_oracle
+    environment:
+      ORACLE_PASSWORD: test_password
+      APP_USER: test_user
+      APP_USER_PASSWORD: test_password
+    ports:
+      - "1521:1521"
+    healthcheck:
+      test: ["CMD-SHELL", "echo 'SELECT 1 FROM DUAL;' | /opt/oracle/product/21c/dbhomeXE/bin/sqlplus test_user/test_password@XEPDB1"]
+      interval: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.0"
+
+  mssql:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: test_loco_noco_mssql
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "Test@1234"
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost,1433", "-U", "SA", "-P", "Test@1234", "-Q", "SELECT 1"]
+      interval: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.0"
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    container_name: test_loco_noco_elasticsearch
+    environment:
+      discovery.type: "single-node"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health"]
+      interval: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "1.0"
