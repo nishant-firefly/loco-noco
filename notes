@@ -1,0 +1,89 @@
+mkdir lcnc_ashma_api && cd lcnc_ashma_api
+python -m venv venv
+source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+pip install django djangorestframework djangorestframework-simplejwt psycopg2
+django-admin startproject core .
+django-admin startapp api
+python manage.py test api
+docker image prune -a
+docker volume prune
+docker system prune -a
+
+docker buildx prune --all
+docker-compose down -v
+docker-compose up --build
+docker ps
+docker exec -it django_container env | grep POSTGRES
+docker exec -it django_container python manage.py migrate
+
+(venv) D:\workspace\lcnc_ashma_api>docker exec -it django_container python manage.py createsuperuser
+Username: postgres
+Email address: deeptishukla515@gmail.com
+Password:postgres
+Password (again):
+The password is too similar to the username.
+Bypass password validation and create user anyway? [y/N]: y
+Superuser created successfully.
+
+
+docker exec -it django_container pip install openpyxl
+docker exec -it django_container pip install -r requirements.txt
+docker exec -it django_container python manage.py test api
+
+docker exec -it django_container python manage.py createsuperuser
+(venv) D:\workspace\lcnc_ashma_api>docker exec -it django_container python manage.py createsuperuser
+Username: postgres
+Email address: deeptishukla515@gmail.com
+Password:
+Password (again):
+The password is too similar to the username.
+Bypass password validation and create user anyway? [y/N]: y
+Superuser created successfully.
+
+docker exec -it django_container python manage.py runserver 0.0.0.0:8100
+
+
+
+
+
+🔥 Alternative Quick Fix (without changing docker-compose.yml)
+If you don't want to modify docker-compose.yml, you can restart Django inside the container on port 8000:
+
+
+
+docker exec -it django_container bash python manage.py runserver 0.0.0.0:8000
+Now your existing docker-compose.yml (mapping 8200:8000) will work.
+
+🔹 Try opening: http://localhost:8200/
+
+
+## Test API in Postman
+
+![alt text](image.png)
+
+http://localhost:8200/api/
+
+✅ Step 1: Use Token-Based Authentication (If Applicable)
+If your API is using JWT (JSON Web Token) authentication, follow these steps:
+
+First, obtain a token by sending a POST request to your login endpoint.
+
+
+POST http://localhost:8200/api/token/
+In the Body (form-data or JSON), include:
+
+
+{
+  "username": "your_username",
+  "password": "your_password"
+}
+This should return an access token.
+
+✅ Step 1: Copy the Access Token
+From the response body, copy the value of "access" (the JWT access token).
+✅ Step 2: Use the Token in Your API Request
+Open Postman and go to your GET or POST request (e.g., http://localhost:8200/api/users/).
+Navigate to the Authorization tab.
+Select Bearer Token as the Auth Type.
+Paste the access token into the token field.
+Click Send to retry the request.

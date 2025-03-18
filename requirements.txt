@@ -1,0 +1,14 @@
+django
+djangorestframework
+djangorestframework-simplejwt
+django_extensions
+psycopg2
+pandas
+drf-yasg
+gunicorn
+python-dotenv
+python-dotenv
+pytest-cov
+pytest-django
+xlsxwriter
+openpyxl
